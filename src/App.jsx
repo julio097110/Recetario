@@ -47,6 +47,8 @@ const notaColor = (n) => {
   return { bg: "#fde8e8", color: "#7a2020" };
 };
 
+const capitalize = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
+
 export default function RecetasApp() {
   const [vista, setVista] = useState("lista");
   const [recetas, setRecetas] = useState([]);
@@ -207,7 +209,7 @@ export default function RecetasApp() {
           .filter(i => i.nombre.trim())
           .map(i => ({
             cantidad: i.unidad === "al gusto" ? null : (parseFloat(i.cantidad) || null),
-            unidad: i.unidad === "al gusto" ? "al gusto" : i.unidad,
+            unidad: i.unidad,
             nombre: i.nombre.trim().toLowerCase(),
           })),
         tiempo_prep: parseInt(form.tiempo_prep) || 0,
@@ -258,7 +260,6 @@ export default function RecetasApp() {
         let data = JSON.parse(ev.target.result);
         if (!Array.isArray(data)) data = [data];
         for (const r of data) {
-          // Soporta tanto ingredientes_detalle estructurado como ingredientes texto plano
           let ingDetalle = [];
           if (Array.isArray(r.ingredientes_detalle)) {
             ingDetalle = r.ingredientes_detalle;
@@ -292,7 +293,6 @@ export default function RecetasApp() {
     e.target.value = "";
   };
 
-  // Ingrediente escalado
   const escalarCantidad = (cantidad, racOriginal, racActiva) => {
     if (cantidad === null || cantidad === undefined) return null;
     if (!racOriginal || racOriginal === racActiva) return cantidad;
@@ -300,15 +300,6 @@ export default function RecetasApp() {
     return Math.round(resultado * 100) / 100;
   };
 
-  const formatIngrediente = (ing, racOriginal, racActiva) => {
-    if (ing.unidad === "al gusto" || ing.cantidad === null) {
-      return `${ing.nombre} — al gusto`;
-    }
-    const cant = escalarCantidad(ing.cantidad, racOriginal, racActiva);
-    return `${cant} ${ing.unidad} de ${ing.nombre}`;
-  };
-
-  // Helpers formulario ingredientes
   const addIngrediente = () => setForm(f => ({ ...f, ingredientes_detalle: [...f.ingredientes_detalle, { ...ING_EMPTY }] }));
   const removeIngrediente = (idx) => setForm(f => ({ ...f, ingredientes_detalle: f.ingredientes_detalle.filter((_, i) => i !== idx) }));
   const updateIngrediente = (idx, field, value) => setForm(f => ({
@@ -496,21 +487,18 @@ export default function RecetasApp() {
         <main style={{ ...s.main, maxWidth: 720 }}>
           <button style={s.btnBack} onClick={() => setVista("lista")}>← Volver al recetario</button>
           <div style={s.panel}>
-            {/* Tags */}
             <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
               <span style={{ ...s.tag, background: "#f0e4cc", color: "#5c3d1e" }}>{recetaActiva.categoria}</span>
               {recetaActiva.tipo_cocina && <span style={{ ...s.tag, background: "#e8ddd0", color: "#5c3d1e" }}>{recetaActiva.tipo_cocina}</span>}
               <span style={{ fontSize: 13, fontWeight: 700, color: difficultyColor[recetaActiva.dificultad], display: "flex", alignItems: "center" }}>{recetaActiva.dificultad}</span>
             </div>
 
-            {/* Título */}
             <h1 style={{ fontFamily: "'Playfair Display',serif", fontSize: 32, fontWeight: 800, marginBottom: 8, lineHeight: 1.15 }}>{recetaActiva.nombre}</h1>
             {recetaActiva.autor && <div style={{ fontSize: 14, color: "#8b6040", fontStyle: "italic", marginBottom: 4 }}>por {recetaActiva.autor}</div>}
             {recetaActiva.libro && <div style={{ fontSize: 13, color: "#9a7050", marginBottom: 12 }}>📖 {recetaActiva.libro}</div>}
             {!recetaActiva.autor && !recetaActiva.libro && <div style={{ marginBottom: 12 }} />}
             <p style={{ fontSize: 16, color: "#5c4028", lineHeight: 1.6, marginBottom: 20, fontStyle: "italic" }}>{recetaActiva.descripcion}</p>
 
-            {/* Tiempos y raciones */}
             <div style={{ display: "flex", gap: 24, marginBottom: 24, flexWrap: "wrap", alignItems: "flex-end" }}>
               {recetaActiva.tiempo_prep > 0 && (
                 <div style={{ textAlign: "center" }}>
@@ -526,7 +514,6 @@ export default function RecetasApp() {
                   <div style={{ fontWeight: 600 }}>{formatTiempo(recetaActiva.tiempo_coccion)}</div>
                 </div>
               )}
-              {/* Selector raciones */}
               {recetaActiva.raciones > 0 && (
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 22 }}>👥</div>
@@ -545,7 +532,6 @@ export default function RecetasApp() {
               )}
             </div>
 
-            {/* Apto para */}
             {(recetaActiva.apto_para || []).length > 0 && (
               <div style={{ display: "flex", gap: 6, marginBottom: 24, flexWrap: "wrap" }}>
                 {recetaActiva.apto_para.map(a => <span key={a} style={{ ...s.tag, background: "#e8f0e0", color: "#3a5a28" }}>{a}</span>)}
@@ -563,14 +549,14 @@ export default function RecetasApp() {
                     <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "5px 0", borderBottom: "1px dotted #e0ccb0" }}>
                       <span style={{ minWidth: 6, height: 6, borderRadius: "50%", background: "#c4843c", flexShrink: 0, marginTop: 6, display: "inline-block" }} />
                       {ing.unidad === "al gusto" || ing.cantidad === null ? (
-                        <span style={{ fontSize: 15, color: "#3d2400", textTransform: "capitalize" }}>
-                          {ing.nombre} <span style={{ color: "#9a7050", fontStyle: "italic" }}>— al gusto</span>
+                        <span style={{ fontSize: 15, color: "#3d2400" }}>
+                          {capitalize(ing.nombre)} <span style={{ color: "#9a7050", fontStyle: "italic" }}>— al gusto</span>
                         </span>
                       ) : (
-                        <span style={{ fontSize: 15, color: "#3d2400", textTransform: "capitalize" }}>
-                          <strong style={{ color: escalado ? "#c4843c" : "#2c1f0e" }}>{cantEscalada} {ing.unidad}</strong>
-                          {" de "}{ing.nombre}
-                          {escalado && <span style={{ color: "#b0906a", fontSize: 12, marginLeft: 6 }}>(orig. {ing.cantidad} {ing.unidad})</span>}
+                        <span style={{ fontSize: 15, color: "#3d2400" }}>
+                          <strong style={{ color: escalado ? "#c4843c" : "#2c1f0e" }}>{cantEscalada} {ing.unidad.toLowerCase()}</strong>
+                          {" de "}{capitalize(ing.nombre)}
+                          {escalado && <span style={{ color: "#b0906a", fontSize: 12, marginLeft: 6 }}>(orig. {ing.cantidad} {ing.unidad.toLowerCase()})</span>}
                         </span>
                       )}
                     </div>
@@ -610,12 +596,11 @@ export default function RecetasApp() {
             <div style={{ borderTop: "1px solid #e0ccb0", paddingTop: 20, marginBottom: 20 }}>
               <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 18, marginBottom: 12 }}>Puntuación</h2>
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                {recetaActiva.nota !== null && recetaActiva.nota !== undefined && (
+                {recetaActiva.nota !== null && recetaActiva.nota !== undefined ? (
                   <span style={{ ...s.tag, ...notaColor(recetaActiva.nota), fontSize: 16, padding: "4px 14px" }}>★ {recetaActiva.nota}/10</span>
-                )}
-                {recetaActiva.nota === null || recetaActiva.nota === undefined ? (
+                ) : (
                   <span style={{ fontSize: 13, color: "#9a7a5a", fontStyle: "italic" }}>Sin evaluar aún</span>
-                ) : null}
+                )}
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <input
                     type="number" min="0" max="10" value={notaInput}
