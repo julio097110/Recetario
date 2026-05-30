@@ -118,7 +118,7 @@ const imprimirReceta = (receta) => {
     ${receta.dificultad ? `<span class="badge badge-cat">${receta.dificultad}</span>` : ""}
     ${(receta.apto_para || []).map(a => `<span class="badge badge-tag">${a}</span>`).join("")}
   </div>
-  <div class="logo">Mi Recetario<span>recetario-phi.vercel.app</span></div>
+  <div class="logo">Mi Recetario</div>
 </div>
 <h1>${receta.nombre}</h1>
 ${receta.autor ? `<div class="autor">por ${receta.autor}</div>` : ""}
