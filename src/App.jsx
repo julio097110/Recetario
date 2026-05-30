@@ -20,7 +20,6 @@ const api = async (path, options = {}) => {
 };
 
 const CATEGORIAS = ["Todas", "Desayuno", "Entrante", "Primero", "Segundo", "Guarnición", "Pan", "Postre", "Helado", "Snack", "Bebida"];
-
 const DIFICULTADES = ["Todas", "Fácil", "Media", "Difícil"];
 const APTO_PARA = ["Vegano", "Vegetariano", "Sin gluten", "Sin lactosa"];
 const UNIDADES = ["g", "kg", "ml", "l", "tsp", "tbsp", "unidad", "al gusto"];
@@ -49,6 +48,122 @@ const notaColor = (n) => {
 };
 
 const capitalize = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
+
+const imprimirReceta = (receta) => {
+  const formatIng = (ing) => {
+    if (ing.unidad === "al gusto" || ing.cantidad === null) {
+      return `${capitalize(ing.nombre)} — al gusto`;
+    }
+    return `${ing.cantidad} ${ing.unidad.toLowerCase()} de ${capitalize(ing.nombre)}`;
+  };
+
+  const tiempoPrep = formatTiempo(receta.tiempo_prep);
+  const tiempoCoccion = formatTiempo(receta.tiempo_coccion);
+  const tiempoTotal = formatTiempo((receta.tiempo_prep || 0) + (receta.tiempo_coccion || 0));
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>${receta.nombre} — Mi Recetario</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #fffcf7; font-family: 'Crimson Text', Georgia, serif; color: #2c1f0e; padding: 48px 56px; max-width: 800px; margin: 0 auto; }
+  .border-top { height: 6px; background: linear-gradient(90deg, #c4843c, #5c3d1e, #c4843c, #5c3d1e, #c4843c); margin: -48px -56px 32px; }
+  .header-meta { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge { font-family: 'Crimson Text', serif; font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase; padding: 3px 10px; border-radius: 2px; font-weight: 600; }
+  .badge-cat { background: #f3e8d8; color: #5c3d1e; border: 1px solid #d4b896; }
+  .badge-tag { background: #eef5ee; color: #3a5c3a; border: 1px solid #b5d0b5; }
+  .logo { font-family: 'Playfair Display', serif; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #b09070; text-align: right; }
+  .logo span { display: block; font-size: 9px; color: #c4a882; margin-top: 2px; }
+  h1 { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 700; line-height: 1.15; margin-bottom: 8px; }
+  .autor { font-size: 14px; color: #8b6040; font-style: italic; margin-bottom: 4px; }
+  .libro { font-size: 13px; color: #9a7050; margin-bottom: 12px; }
+  .descripcion { font-size: 17px; color: #5c4028; line-height: 1.6; font-style: italic; margin-bottom: 24px; }
+  .stats { display: flex; gap: 0; border: 1px solid #e2d5c3; border-radius: 3px; overflow: hidden; background: #faf6f0; margin-bottom: 28px; }
+  .stat { flex: 1; text-align: center; padding: 12px 8px; border-right: 1px solid #e2d5c3; }
+  .stat:last-child { border-right: none; }
+  .stat-icon { font-size: 18px; margin-bottom: 3px; display: block; }
+  .stat-value { display: block; font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; line-height: 1; }
+  .stat-label { display: block; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #9a7a5a; margin-top: 3px; }
+  .apto { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 24px; }
+  .body { display: grid; grid-template-columns: 1fr 1.7fr; gap: 36px; margin-top: 4px; }
+  .section-title { font-family: 'Playfair Display', serif; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #c4843c; margin-bottom: 12px; padding-bottom: 7px; border-bottom: 1px solid #e2d5c3; }
+  .ing-list { list-style: none; }
+  .ing-list li { font-size: 14.5px; color: #3a2a14; padding: 5px 0; border-bottom: 1px dotted #ddd0be; display: flex; gap: 8px; align-items: baseline; line-height: 1.3; }
+  .ing-list li:last-child { border-bottom: none; }
+  .ing-dot { width: 5px; height: 5px; border-radius: 50%; background: #c4843c; flex-shrink: 0; margin-top: 5px; }
+  .steps { list-style: none; }
+  .steps li { display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; }
+  .step-num { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: #e2d0b8; line-height: 1; flex-shrink: 0; width: 22px; text-align: right; }
+  .step-text { font-size: 14.5px; color: #3a2a14; line-height: 1.55; }
+  .footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid #e2d5c3; display: flex; justify-content: space-between; align-items: center; }
+  .footer-autor { font-style: italic; font-size: 12px; color: #9a7a5a; }
+  .footer-logo { font-family: 'Playfair Display', serif; font-size: 11px; color: #c4a882; letter-spacing: 0.08em; }
+  @media print {
+    body { padding: 32px 40px; }
+    .border-top { margin: -32px -40px 24px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .stats, .badge, .badge-cat, .badge-tag, .apto span { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="border-top"></div>
+<div class="header-meta">
+  <div class="badges">
+    <span class="badge badge-cat">${receta.categoria}</span>
+    ${receta.tipo_cocina ? `<span class="badge badge-cat">${receta.tipo_cocina}</span>` : ""}
+    ${receta.dificultad ? `<span class="badge badge-cat">${receta.dificultad}</span>` : ""}
+    ${(receta.apto_para || []).map(a => `<span class="badge badge-tag">${a}</span>`).join("")}
+  </div>
+  <div class="logo">Mi Recetario<span>recetario-phi.vercel.app</span></div>
+</div>
+<h1>${receta.nombre}</h1>
+${receta.autor ? `<div class="autor">por ${receta.autor}</div>` : ""}
+${receta.libro ? `<div class="libro">📖 ${receta.libro}</div>` : ""}
+${receta.descripcion ? `<p class="descripcion">${receta.descripcion}</p>` : ""}
+<div class="stats">
+  ${tiempoPrep ? `<div class="stat"><span class="stat-icon">🔪</span><span class="stat-value">${tiempoPrep}</span><span class="stat-label">Preparación</span></div>` : ""}
+  ${tiempoCoccion ? `<div class="stat"><span class="stat-icon">🔥</span><span class="stat-value">${tiempoCoccion}</span><span class="stat-label">Cocción</span></div>` : ""}
+  ${tiempoTotal ? `<div class="stat"><span class="stat-icon">🕐</span><span class="stat-value">${tiempoTotal}</span><span class="stat-label">Total</span></div>` : ""}
+  ${receta.raciones ? `<div class="stat"><span class="stat-icon">👥</span><span class="stat-value">${receta.raciones} rac.</span><span class="stat-label">Raciones</span></div>` : ""}
+</div>
+<div class="body">
+  <div>
+    <div class="section-title">Ingredientes</div>
+    <ul class="ing-list">
+      ${(receta.ingredientes_detalle || []).map(ing => {
+        const texto = ing.unidad === "al gusto" || ing.cantidad === null
+          ? `${capitalize(ing.nombre)} <em style="color:#9a7050">— al gusto</em>`
+          : `<strong>${ing.cantidad} ${ing.unidad.toLowerCase()}</strong> de ${capitalize(ing.nombre)}`;
+        return `<li><span class="ing-dot"></span><span>${texto}</span></li>`;
+      }).join("")}
+    </ul>
+  </div>
+  <div>
+    <div class="section-title">Elaboración</div>
+    <ol class="steps">
+      ${(receta.pasos || []).map((paso, i) => `
+        <li><span class="step-num">${i + 1}</span><span class="step-text">${paso}</span></li>
+      `).join("")}
+    </ol>
+  </div>
+</div>
+<div class="footer">
+  <span class="footer-autor">${receta.autor ? `Receta de ${receta.autor}${receta.libro ? ` · ${receta.libro}` : ""}` : receta.libro ? `📖 ${receta.libro}` : "Mi Recetario"}</span>
+  <span class="footer-logo">Mi Recetario</span>
+</div>
+</body>
+</html>`;
+
+  const ventana = window.open("", "_blank");
+  ventana.document.write(html);
+  ventana.document.close();
+  ventana.focus();
+  setTimeout(() => ventana.print(), 600);
+};
 
 export default function RecetasApp() {
   const [vista, setVista] = useState("lista");
@@ -153,7 +268,7 @@ export default function RecetasApp() {
   }), [recetas, busqueda, filtroCategoria, filtroDificultad, filtroApto, filtroLibro, filtroTiempo, filtroNota]);
 
   const toggleApto = (a) => setFiltroApto((p) => p.includes(a) ? p.filter(x => x !== a) : [...p, a]);
-  const filtrosActivos = filtroCategoria !== "Todas" || filtroDificultad !== "Todas" || filtroApto.length > 0 || filtroLibro || filtroTiempo || filtroNota;
+  const filtrosActivos = filtroCategoria !== "Todas" || filtroDificultad !== "Todas" || filtroApto.length > 0 || filtroLibro || filtroTiempo || filtroNota || busqueda;
 
   const abrirDetalle = (r) => {
     setRecetaActiva(r);
@@ -428,7 +543,7 @@ export default function RecetasApp() {
                 </div>
               )}
               {filtrosActivos && (
-                <button onClick={() => { setFiltroCategoria("Todas"); setFiltroDificultad("Todas"); setFiltroApto([]); setFiltroLibro(""); setFiltroTiempo(""); setFiltroNota(""); }}
+                <button onClick={() => { setFiltroCategoria("Todas"); setFiltroDificultad("Todas"); setFiltroApto([]); setFiltroLibro(""); setFiltroTiempo(""); setFiltroNota(""); setBusqueda(""); }}
                   style={{ alignSelf: "flex-start", color: "#8b3a2a", background: "none", border: "none", fontSize: 13, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}>
                   Limpiar filtros
                 </button>
@@ -440,9 +555,6 @@ export default function RecetasApp() {
             <div style={{ textAlign: "center", padding: 60, color: "#8b6040" }}>Cargando recetas…</div>
           ) : (
             <>
-              <div style={{ fontSize: 13, color: "#8b6040", marginBottom: 16 }}>
-                {recetasFiltradas.length} {recetasFiltradas.length === 1 ? "receta encontrada" : "recetas encontradas"}
-              </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 18 }}>
                 {recetasFiltradas.map(r => (
                   <div key={r.id} className="hcard" style={s.card} onClick={() => abrirDetalle(r)}>
@@ -471,11 +583,21 @@ export default function RecetasApp() {
                   </div>
                 ))}
               </div>
+
               {recetasFiltradas.length === 0 && (
                 <div style={{ textAlign: "center", padding: "60px 20px", color: "#8b6040" }}>
                   <div style={{ fontSize: 48, marginBottom: 16 }}>🍽️</div>
                   <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, marginBottom: 8 }}>No se encontraron recetas</div>
                   <div style={{ fontSize: 14 }}>Prueba a cambiar los filtros o añade una nueva receta.</div>
+                </div>
+              )}
+
+              {recetas.length > 0 && (
+                <div style={{ marginTop: 40, paddingTop: 20, borderTop: "1px solid #e0ccb0", textAlign: "center", color: "#9a7a5a", fontSize: 13 }}>
+                  {filtrosActivos
+                    ? <>{recetasFiltradas.length} receta{recetasFiltradas.length !== 1 ? "s" : ""} encontrada{recetasFiltradas.length !== 1 ? "s" : ""} · <span style={{ color: "#b0906a" }}>{recetas.length} en total</span></>
+                    : <>{recetas.length} receta{recetas.length !== 1 ? "s" : ""} en el recetario</>
+                  }
                 </div>
               )}
             </>
@@ -618,9 +740,10 @@ export default function RecetasApp() {
             </div>
 
             {/* Acciones */}
-            <div style={{ display: "flex", gap: 10, borderTop: "1px solid #e0ccb0", paddingTop: 20 }}>
+            <div style={{ display: "flex", gap: 10, borderTop: "1px solid #e0ccb0", paddingTop: 20, flexWrap: "wrap" }}>
               <button style={s.btnSecondary} onClick={() => abrirEditar(recetaActiva)}>✏️ Editar</button>
               <button style={{ ...s.btnSecondary, color: "#8b3a2a", borderColor: "#8b3a2a" }} onClick={() => eliminarReceta(recetaActiva.id)}>🗑️ Eliminar</button>
+              <button style={{ ...s.btnSecondary, marginLeft: "auto" }} onClick={() => imprimirReceta(recetaActiva)}>🖨️ Imprimir / PDF</button>
             </div>
           </div>
         </main>
