@@ -19,7 +19,8 @@ const api = async (path, options = {}) => {
   return text ? JSON.parse(text) : null;
 };
 
-const CATEGORIAS = ["Todas", "Desayuno", "Entrante", "Primero", "Segundo", "Postre", "Snack", "Bebida"];
+const CATEGORIAS = ["Todas", "Desayuno", "Entrante", "Primero", "Segundo", "Guarnición", "Pan", "Postre", "Helado", "Snack", "Bebida"];
+
 const DIFICULTADES = ["Todas", "Fácil", "Media", "Difícil"];
 const APTO_PARA = ["Vegano", "Vegetariano", "Sin gluten", "Sin lactosa"];
 const UNIDADES = ["g", "kg", "ml", "l", "tsp", "tbsp", "unidad", "al gusto"];
