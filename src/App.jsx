@@ -30,7 +30,7 @@ const FORM_EMPTY = {
   nombre: "", categoria: "Primero", tipo_cocina: "", apto_para: [],
   ingredientes_detalle: [{ ...ING_EMPTY }],
   tiempo_prep: "", tiempo_coccion: "", dificultad: "Fácil",
-  raciones: "", descripcion: "", pasos: "", autor: "", libro: "",
+  raciones: "", descripcion: "", pasos: "", autor: "", libro: "", tabla_flujo: null,
 };
 
 const formatTiempo = (min) => {
@@ -48,6 +48,21 @@ const notaColor = (n) => {
 };
 
 const capitalize = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
+
+// Construye la rejilla de la tabla de flujo (esquema visual) a partir de columnas
+// con celdas que ocupan varias filas (rowspan), calculando en qué fila empieza cada celda.
+const construirGridFlujo = (columnas) => {
+  const conInicio = columnas.map(col => {
+    let acc = 0;
+    return col.filas.map(f => {
+      const inicio = acc;
+      acc += f.rowspan || 1;
+      return { ...f, inicio };
+    });
+  });
+  const totalFilas = Math.max(0, ...conInicio.map(col => col.reduce((s, f) => s + (f.rowspan || 1), 0)));
+  return { columnas: conInicio, totalFilas };
+};
 
 const imprimirReceta = (receta) => {
   const formatIng = (ing) => {
@@ -99,6 +114,10 @@ const imprimirReceta = (receta) => {
   .steps li { display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; }
   .step-num { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: #e2d0b8; line-height: 1; flex-shrink: 0; width: 22px; text-align: right; }
   .step-text { font-size: 14.5px; color: #3a2a14; line-height: 1.55; }
+  .flujo { margin-top: 28px; }
+  .flujo-nota { border: 1.5px solid #d4b896; background: #fffcf7; padding: 7px 12px; font-size: 12.5px; text-align: center; }
+  .flujo-tabla { border-collapse: collapse; width: 100%; margin-top: 8px; table-layout: fixed; }
+  .flujo-tabla td { border: 1.5px solid #d4b896; padding: 8px 10px; font-size: 12.5px; vertical-align: middle; }
   .footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid #e2d5c3; display: flex; justify-content: space-between; align-items: center; }
   .footer-autor { font-style: italic; font-size: 12px; color: #9a7a5a; }
   .footer-logo { font-family: 'Playfair Display', serif; font-size: 11px; color: #c4a882; letter-spacing: 0.08em; }
@@ -151,6 +170,20 @@ ${receta.descripcion ? `<p class="descripcion">${receta.descripcion}</p>` : ""}
     </ol>
   </div>
 </div>
+${receta.tabla_flujo ? (() => {
+  const { columnas, totalFilas } = construirGridFlujo(receta.tabla_flujo.columnas || []);
+  let filasHtml = "";
+  for (let r = 0; r < totalFilas; r++) {
+    filasHtml += "<tr>";
+    columnas.forEach(col => {
+      const celda = col.find(f => f.inicio === r);
+      if (celda) filasHtml += `<td rowspan="${celda.rowspan || 1}" style="text-align:${celda.texto ? "left" : "center"}">${celda.texto || ""}</td>`;
+    });
+    filasHtml += "</tr>";
+  }
+  const notasHtml = (receta.tabla_flujo.notas_previas || []).map(n => `<div class="flujo-nota">${n}</div>`).join("");
+  return `<div class="flujo"><div class="section-title">Esquema visual</div>${notasHtml}<table class="flujo-tabla"><tbody>${filasHtml}</tbody></table></div>`;
+})() : ""}
 <div class="footer">
   <span class="footer-autor">${receta.autor ? `Receta de ${receta.autor}${receta.libro ? ` · ${receta.libro}` : ""}` : receta.libro ? `📖 ${receta.libro}` : "Mi Recetario"}</span>
   <span class="footer-logo">Mi Recetario</span>
@@ -301,6 +334,7 @@ export default function RecetasApp() {
       pasos: (r.pasos || []).join("\n"),
       autor: r.autor || "",
       libro: r.libro || "",
+      tabla_flujo: r.tabla_flujo || null,
     });
     setEditando(r.id);
     setVista("formulario");
@@ -336,6 +370,7 @@ export default function RecetasApp() {
         pasos: form.pasos.split("\n").filter(Boolean),
         autor: form.autor || null,
         libro: form.libro || null,
+        tabla_flujo: form.tabla_flujo || null,
       };
       if (editando) {
         await api(`recetas?id=eq.${editando}`, { method: "PATCH", body: JSON.stringify(payload) });
@@ -396,6 +431,7 @@ export default function RecetasApp() {
             pasos: Array.isArray(r.pasos) ? r.pasos : (r.pasos || "").split("\n").filter(Boolean),
             autor: r.autor || null,
             libro: r.libro || null,
+            tabla_flujo: r.tabla_flujo || null,
           };
           await api("recetas", { method: "POST", body: JSON.stringify(payload) });
         }
@@ -714,6 +750,45 @@ export default function RecetasApp() {
                 })}
               </ol>
             </div>
+
+            {/* Esquema visual (tabla de flujo) */}
+            {recetaActiva.tabla_flujo && (
+              <div style={{ borderTop: "1px solid #e0ccb0", paddingTop: 20, marginBottom: 24 }}>
+                <h2 style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, marginBottom: 16 }}>Esquema visual</h2>
+                {(recetaActiva.tabla_flujo.notas_previas || []).map((nota, i) => (
+                  <div key={i} style={{ border: "1.5px solid #d4b896", background: "#fffcf7", padding: "8px 14px", fontSize: 14, textAlign: "center", color: "#3d2400", marginBottom: i === (recetaActiva.tabla_flujo.notas_previas.length - 1) ? 0 : -1 }}>
+                    {nota}
+                  </div>
+                ))}
+                <div style={{ overflowX: "auto", marginTop: (recetaActiva.tabla_flujo.notas_previas || []).length ? 0 : 0 }}>
+                  <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+                    <tbody>
+                      {(() => {
+                        const { columnas, totalFilas } = construirGridFlujo(recetaActiva.tabla_flujo.columnas || []);
+                        const filas = [];
+                        for (let r = 0; r < totalFilas; r++) {
+                          filas.push(
+                            <tr key={r}>
+                              {columnas.map((col, ci) => {
+                                const celda = col.find(f => f.inicio === r);
+                                if (!celda) return null;
+                                return (
+                                  <td key={ci} rowSpan={celda.rowspan || 1}
+                                    style={{ border: "1.5px solid #d4b896", padding: "10px 12px", fontSize: 14, color: "#3d2400", verticalAlign: "middle", textAlign: celda.texto ? "left" : "center" }}>
+                                    {celda.texto}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        }
+                        return filas;
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Puntuación */}
             <div style={{ borderTop: "1px solid #e0ccb0", paddingTop: 20, marginBottom: 20 }}>
