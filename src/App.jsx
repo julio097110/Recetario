@@ -402,7 +402,57 @@ export default function RecetasApp() {
     }
   };
 
-  const importarJSON = (e) => {
+// Campos válidos de la tabla recetas para actualizaciones parciales (upsert por nombre)
+const CAMPOS_RECETA = ["nombre", "categoria", "tipo_cocina", "apto_para", "ingredientes_detalle", "ingredientes",
+  "tiempo_prep", "tiempo_coccion", "dificultad", "raciones", "descripcion", "pasos", "autor", "libro", "tabla_flujo"];
+
+const construirPayloadCompleto = (r) => {
+  let ingDetalle = [];
+  if (Array.isArray(r.ingredientes_detalle)) {
+    ingDetalle = r.ingredientes_detalle;
+  } else if (Array.isArray(r.ingredientes)) {
+    ingDetalle = r.ingredientes.map(i => ({ cantidad: null, unidad: null, nombre: i }));
+  }
+  return {
+    nombre: r.nombre || "",
+    categoria: r.categoria || "Primero",
+    tipo_cocina: r.tipo_cocina || "",
+    apto_para: r.apto_para || [],
+    ingredientes_detalle: ingDetalle,
+    tiempo_prep: parseInt(r.tiempo_prep) || 0,
+    tiempo_coccion: parseInt(r.tiempo_coccion) || 0,
+    dificultad: r.dificultad || "Fácil",
+    raciones: parseInt(r.raciones) || 0,
+    descripcion: r.descripcion || "",
+    pasos: Array.isArray(r.pasos) ? r.pasos : (r.pasos || "").split("\n").filter(Boolean),
+    autor: r.autor || null,
+    libro: r.libro || null,
+    tabla_flujo: r.tabla_flujo || null,
+  };
+};
+
+// Construye un payload SOLO con los campos presentes en el JSON importado,
+// para poder actualizar una receta existente sin borrar el resto de sus datos.
+const construirPayloadParcial = (r) => {
+  const parcial = {};
+  const claves = Object.keys(r);
+  if (claves.includes("ingredientes") && !claves.includes("ingredientes_detalle")) {
+    parcial.ingredientes_detalle = (r.ingredientes || []).map(i => ({ cantidad: null, unidad: null, nombre: i }));
+  }
+  for (const clave of claves) {
+    if (clave === "ingredientes" || !CAMPOS_RECETA.includes(clave)) continue;
+    if (clave === "tiempo_prep" || clave === "tiempo_coccion" || clave === "raciones") {
+      parcial[clave] = parseInt(r[clave]) || 0;
+    } else if (clave === "pasos") {
+      parcial.pasos = Array.isArray(r.pasos) ? r.pasos : (r.pasos || "").split("\n").filter(Boolean);
+    } else {
+      parcial[clave] = r[clave];
+    }
+  }
+  return parcial;
+};
+
+const importarJSON = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
@@ -410,33 +460,31 @@ export default function RecetasApp() {
       try {
         let data = JSON.parse(ev.target.result);
         if (!Array.isArray(data)) data = [data];
+        let creadas = 0, actualizadas = 0, omitidas = 0;
         for (const r of data) {
-          let ingDetalle = [];
-          if (Array.isArray(r.ingredientes_detalle)) {
-            ingDetalle = r.ingredientes_detalle;
-          } else if (Array.isArray(r.ingredientes)) {
-            ingDetalle = r.ingredientes.map(i => ({ cantidad: null, unidad: null, nombre: i }));
+          const nombreBuscado = (r.nombre || "").trim();
+          let existentes = [];
+          if (nombreBuscado) {
+            existentes = await api(`recetas?nombre=eq.${encodeURIComponent(nombreBuscado)}&select=id,nombre,autor,libro`);
           }
-          const payload = {
-            nombre: r.nombre || "",
-            categoria: r.categoria || "Primero",
-            tipo_cocina: r.tipo_cocina || "",
-            apto_para: r.apto_para || [],
-            ingredientes_detalle: ingDetalle,
-            tiempo_prep: parseInt(r.tiempo_prep) || 0,
-            tiempo_coccion: parseInt(r.tiempo_coccion) || 0,
-            dificultad: r.dificultad || "Fácil",
-            raciones: parseInt(r.raciones) || 0,
-            descripcion: r.descripcion || "",
-            pasos: Array.isArray(r.pasos) ? r.pasos : (r.pasos || "").split("\n").filter(Boolean),
-            autor: r.autor || null,
-            libro: r.libro || null,
-            tabla_flujo: r.tabla_flujo || null,
-          };
-          await api("recetas", { method: "POST", body: JSON.stringify(payload) });
+          if (existentes && existentes.length > 0) {
+            const existente = existentes[0];
+            const detalle = existente.autor ? ` (${existente.autor})` : (existente.libro ? ` (${existente.libro})` : "");
+            const confirmar = window.confirm(
+              `Ya existe una receta llamada "${existente.nombre}"${detalle}.\n\n¿Actualizar SOLO los campos indicados en este JSON sobre esa receta existente?\n\nAceptar = actualizar · Cancelar = omitir esta receta (no se creará duplicado)`
+            );
+            if (!confirmar) { omitidas++; continue; }
+            const parcial = construirPayloadParcial(r);
+            await api(`recetas?id=eq.${existente.id}`, { method: "PATCH", body: JSON.stringify(parcial) });
+            actualizadas++;
+          } else {
+            const payload = construirPayloadCompleto(r);
+            await api("recetas", { method: "POST", body: JSON.stringify(payload) });
+            creadas++;
+          }
         }
         await cargarRecetas();
-        alert(`✅ ${data.length} receta${data.length > 1 ? "s" : ""} importada${data.length > 1 ? "s" : ""} correctamente.`);
+        alert(`✅ Importación completa.\nCreadas: ${creadas}\nActualizadas: ${actualizadas}\nOmitidas: ${omitidas}`);
       } catch (err) {
         alert("Error al importar: " + err.message);
       }
