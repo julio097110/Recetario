@@ -116,7 +116,7 @@ const imprimirReceta = (receta) => {
   .step-text { font-size: 14.5px; color: #3a2a14; line-height: 1.55; }
   .flujo { margin-top: 28px; }
   .flujo-nota { border: 1.5px solid #d4b896; background: #fffcf7; padding: 7px 12px; font-size: 12.5px; text-align: center; }
-  .flujo-tabla { border-collapse: collapse; width: 100%; margin-top: 8px; table-layout: fixed; }
+  .flujo-tabla { border-collapse: collapse; width: 100%; margin-top: 8px; table-layout: auto; }
   .flujo-tabla td { border: 1.5px solid #d4b896; padding: 8px 10px; font-size: 12.5px; vertical-align: middle; }
   .footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid #e2d5c3; display: flex; justify-content: space-between; align-items: center; }
   .footer-autor { font-style: italic; font-size: 12px; color: #9a7a5a; }
@@ -809,7 +809,7 @@ const importarJSON = (e) => {
                   </div>
                 ))}
                 <div style={{ overflowX: "auto", marginTop: (recetaActiva.tabla_flujo.notas_previas || []).length ? 0 : 0 }}>
-                  <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+                  <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "auto" }}>
                     <tbody>
                       {(() => {
                         const { columnas, totalFilas } = construirGridFlujo(recetaActiva.tabla_flujo.columnas || []);
@@ -822,7 +822,7 @@ const importarJSON = (e) => {
                                 if (!celda) return null;
                                 return (
                                   <td key={ci} rowSpan={celda.rowspan || 1}
-                                    style={{ border: "1.5px solid #d4b896", padding: "10px 12px", fontSize: 14, color: "#3d2400", verticalAlign: "middle", textAlign: celda.texto ? "left" : "center" }}>
+                                    style={{ border: "1.5px solid #d4b896", padding: "10px 12px", fontSize: 14, color: "#3d2400", verticalAlign: "middle", textAlign: celda.texto ? "left" : "center", whiteSpace: "nowrap" }}>
                                     {celda.texto}
                                   </td>
                                 );
