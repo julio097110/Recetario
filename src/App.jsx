@@ -116,8 +116,9 @@ const imprimirReceta = (receta) => {
   .step-text { font-size: 14.5px; color: #3a2a14; line-height: 1.55; }
   .flujo { margin-top: 28px; }
   .flujo-nota { border: 1.5px solid #d4b896; background: #fffcf7; padding: 7px 12px; font-size: 12.5px; text-align: center; }
-  .flujo-tabla { border-collapse: collapse; width: 100%; margin-top: 8px; table-layout: auto; }
-  .flujo-tabla td { border: 1.5px solid #d4b896; padding: 8px 10px; font-size: 12.5px; vertical-align: middle; }
+  .flujo-tabla-wrap { border: 3px solid #5c3d1e; overflow-x: auto; margin-top: 8px; }
+  .flujo-tabla { border-collapse: collapse; width: 100%; table-layout: auto; }
+  .flujo-tabla td { border: 1.5px solid #d4b896; padding: 8px 10px; font-size: 12.5px; vertical-align: middle; white-space: nowrap; }
   .footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid #e2d5c3; display: flex; justify-content: space-between; align-items: center; }
   .footer-autor { font-style: italic; font-size: 12px; color: #9a7a5a; }
   .footer-logo { font-family: 'Playfair Display', serif; font-size: 11px; color: #c4a882; letter-spacing: 0.08em; }
@@ -182,7 +183,7 @@ ${receta.tabla_flujo ? (() => {
     filasHtml += "</tr>";
   }
   const notasHtml = (receta.tabla_flujo.notas_previas || []).map(n => `<div class="flujo-nota">${n}</div>`).join("");
-  return `<div class="flujo"><div class="section-title">Esquema visual</div>${notasHtml}<table class="flujo-tabla"><tbody>${filasHtml}</tbody></table></div>`;
+  return `<div class="flujo"><div class="section-title">Esquema visual</div>${notasHtml}<div class="flujo-tabla-wrap"><table class="flujo-tabla"><tbody>${filasHtml}</tbody></table></div></div>`;
 })() : ""}
 <div class="footer">
   <span class="footer-autor">${receta.autor ? `Receta de ${receta.autor}${receta.libro ? ` · ${receta.libro}` : ""}` : receta.libro ? `📖 ${receta.libro}` : "Mi Recetario"}</span>
@@ -808,7 +809,7 @@ const importarJSON = (e) => {
                     {nota}
                   </div>
                 ))}
-                <div style={{ overflowX: "auto", marginTop: (recetaActiva.tabla_flujo.notas_previas || []).length ? 0 : 0 }}>
+                <div style={{ overflowX: "auto", marginTop: (recetaActiva.tabla_flujo.notas_previas || []).length ? 0 : 0, border: "3px solid #5c3d1e", display: "inline-block", minWidth: "100%" }}>
                   <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "auto" }}>
                     <tbody>
                       {(() => {
