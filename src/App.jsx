@@ -115,8 +115,9 @@ const imprimirReceta = (receta) => {
   .step-num { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: #e2d0b8; line-height: 1; flex-shrink: 0; width: 22px; text-align: right; }
   .step-text { font-size: 14.5px; color: #3a2a14; line-height: 1.55; }
   .flujo { margin-top: 28px; page-break-before: always; break-before: page; }
+  ${receta.tabla_flujo ? '@page { size: landscape; }' : ''}
   .flujo-nota { border: 1.5px solid #d4b896; background: #fffcf7; padding: 7px 12px; font-size: 12.5px; text-align: center; }
-  .flujo-tabla-wrap { border: 3px solid #5c3d1e; overflow-x: auto; margin-top: 8px; }
+  .flujo-tabla-wrap { border: 3px solid #5c3d1e; margin-top: 8px; }
   .flujo-tabla { border-collapse: collapse; width: 100%; table-layout: auto; }
   .flujo-tabla td { border: 1.5px solid #d4b896; padding: 8px 10px; font-size: 12.5px; vertical-align: middle; white-space: nowrap; }
   .footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid #e2d5c3; display: flex; justify-content: space-between; align-items: center; }
