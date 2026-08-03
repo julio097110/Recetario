@@ -114,7 +114,7 @@ const imprimirReceta = (receta) => {
   .steps li { display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; }
   .step-num { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: #e2d0b8; line-height: 1; flex-shrink: 0; width: 22px; text-align: right; }
   .step-text { font-size: 14.5px; color: #3a2a14; line-height: 1.55; }
-  .flujo { margin-top: 28px; }
+  .flujo { margin-top: 28px; page-break-before: always; break-before: page; }
   .flujo-nota { border: 1.5px solid #d4b896; background: #fffcf7; padding: 7px 12px; font-size: 12.5px; text-align: center; }
   .flujo-tabla-wrap { border: 3px solid #5c3d1e; overflow-x: auto; margin-top: 8px; }
   .flujo-tabla { border-collapse: collapse; width: 100%; table-layout: auto; }
@@ -809,7 +809,7 @@ const importarJSON = (e) => {
                     {nota}
                   </div>
                 ))}
-                <div style={{ overflowX: "auto", marginTop: (recetaActiva.tabla_flujo.notas_previas || []).length ? 0 : 0, border: "3px solid #5c3d1e", display: "inline-block", minWidth: "100%" }}>
+                <div style={{ overflowX: "auto", marginTop: (recetaActiva.tabla_flujo.notas_previas || []).length ? 0 : 0, border: "3px solid #5c3d1e", width: "100%" }}>
                   <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "auto" }}>
                     <tbody>
                       {(() => {
