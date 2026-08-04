@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const SUPABASE_URL = "https://sentaokgxmshmpkfbtlc.supabase.co";
 const SUPABASE_KEY = "sb_publishable_PFq4Ne_RMuqIza1tW4UVKw_Re74J3Di";
@@ -64,140 +66,132 @@ const construirGridFlujo = (columnas) => {
   return { columnas: conInicio, totalFilas };
 };
 
-const imprimirReceta = (receta) => {
-  const formatIng = (ing) => {
-    if (ing.unidad === "al gusto" || ing.cantidad === null) {
-      return `${capitalize(ing.nombre)} — al gusto`;
-    }
-    return `${ing.cantidad} ${ing.unidad.toLowerCase()} de ${capitalize(ing.nombre)}`;
-  };
+const formatIngPdf = (ing) => {
+  if (ing.unidad === "al gusto" || ing.cantidad === null) {
+    return `${capitalize(ing.nombre)} — al gusto`;
+  }
+  return `${ing.cantidad} ${ing.unidad.toLowerCase()} de ${capitalize(ing.nombre)}`;
+};
 
+// Genera el PDF de la receta directamente con jsPDF (sin pasar por el diálogo de
+// impresión del navegador), para que la orientación apaisada de la tabla de flujo
+// quede fijada en el propio archivo y no dependa de que el navegador la respete.
+const generarPDF = (receta) => {
+  const COLOR_TEXTO = [61, 36, 0];
+  const COLOR_BORDE = [212, 184, 150];
+  const COLOR_MARCO = [92, 61, 30];
+  const COLOR_TITULO = [44, 31, 14];
+  const COLOR_ACENTO = [196, 132, 60];
+
+  // --- Página 1: ficha de la receta (ingredientes + elaboración), vertical ---
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const marginX = 15;
+  let y = 18;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(...COLOR_TITULO);
+  doc.text(receta.nombre, marginX, y);
+  y += 7;
+
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(10);
+  doc.setTextColor(...COLOR_ACENTO);
+  const metaBits = [receta.categoria, receta.tipo_cocina, receta.dificultad].filter(Boolean).join("   ·   ");
+  if (metaBits) { doc.text(metaBits, marginX, y); y += 6; }
+
+  if (receta.autor) { doc.text(`por ${receta.autor}`, marginX, y); y += 5; }
+  if (receta.libro) { doc.text(receta.libro, marginX, y); y += 5; }
+
+  if (receta.descripcion) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(11);
+    doc.setTextColor(...COLOR_TEXTO);
+    const lineas = doc.splitTextToSize(receta.descripcion, 180);
+    doc.text(lineas, marginX, y + 3);
+    y += 3 + lineas.length * 5.5;
+  }
+
+  y += 4;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...COLOR_ACENTO);
+  const stats = [];
   const tiempoPrep = formatTiempo(receta.tiempo_prep);
   const tiempoCoccion = formatTiempo(receta.tiempo_coccion);
-  const tiempoTotal = formatTiempo((receta.tiempo_prep || 0) + (receta.tiempo_coccion || 0));
+  if (tiempoPrep) stats.push(`Prep: ${tiempoPrep}`);
+  if (tiempoCoccion) stats.push(`Cocción: ${tiempoCoccion}`);
+  if (receta.raciones) stats.push(`${receta.raciones} raciones`);
+  if (stats.length) { doc.text(stats.join("   ·   "), marginX, y); y += 8; }
 
-  const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>${receta.nombre} — Mi Recetario</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #fffcf7; font-family: 'Crimson Text', Georgia, serif; color: #2c1f0e; padding: 48px 56px; max-width: 800px; margin: 0 auto; }
-  .border-top { height: 6px; background: linear-gradient(90deg, #c4843c, #5c3d1e, #c4843c, #5c3d1e, #c4843c); margin: -48px -56px 32px; }
-  .header-meta { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
-  .badges { display: flex; flex-wrap: wrap; gap: 6px; }
-  .badge { font-family: 'Crimson Text', serif; font-size: 11px; letter-spacing: 0.10em; text-transform: uppercase; padding: 3px 10px; border-radius: 2px; font-weight: 600; }
-  .badge-cat { background: #f3e8d8; color: #5c3d1e; border: 1px solid #d4b896; }
-  .badge-tag { background: #eef5ee; color: #3a5c3a; border: 1px solid #b5d0b5; }
-  .logo { font-family: 'Playfair Display', serif; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #b09070; text-align: right; }
-  .logo span { display: block; font-size: 9px; color: #c4a882; margin-top: 2px; }
-  h1 { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 700; line-height: 1.15; margin-bottom: 8px; }
-  .autor { font-size: 14px; color: #8b6040; font-style: italic; margin-bottom: 4px; }
-  .libro { font-size: 13px; color: #9a7050; margin-bottom: 12px; }
-  .descripcion { font-size: 17px; color: #5c4028; line-height: 1.6; font-style: italic; margin-bottom: 24px; }
-  .stats { display: flex; gap: 0; border: 1px solid #e2d5c3; border-radius: 3px; overflow: hidden; background: #faf6f0; margin-bottom: 28px; }
-  .stat { flex: 1; text-align: center; padding: 12px 8px; border-right: 1px solid #e2d5c3; }
-  .stat:last-child { border-right: none; }
-  .stat-icon { font-size: 18px; margin-bottom: 3px; display: block; }
-  .stat-value { display: block; font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; line-height: 1; }
-  .stat-label { display: block; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #9a7a5a; margin-top: 3px; }
-  .apto { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 24px; }
-  .body { display: grid; grid-template-columns: 1fr 1.7fr; gap: 36px; margin-top: 4px; }
-  .section-title { font-family: 'Playfair Display', serif; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #c4843c; margin-bottom: 12px; padding-bottom: 7px; border-bottom: 1px solid #e2d5c3; }
-  .ing-list { list-style: none; }
-  .ing-list li { font-size: 14.5px; color: #3a2a14; padding: 5px 0; border-bottom: 1px dotted #ddd0be; display: flex; gap: 8px; align-items: baseline; line-height: 1.3; }
-  .ing-list li:last-child { border-bottom: none; }
-  .ing-dot { width: 5px; height: 5px; border-radius: 50%; background: #c4843c; flex-shrink: 0; margin-top: 5px; }
-  .steps { list-style: none; }
-  .steps li { display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; }
-  .step-num { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: #e2d0b8; line-height: 1; flex-shrink: 0; width: 22px; text-align: right; }
-  .step-text { font-size: 14.5px; color: #3a2a14; line-height: 1.55; }
-  .flujo { margin-top: 28px; page-break-before: always; break-before: page; }
-  ${receta.tabla_flujo ? '@page { size: 297mm 210mm; margin: 15mm; }' : ''}
-  .flujo-nota { border: 1.5px solid #d4b896; background: #fffcf7; padding: 7px 12px; font-size: 12.5px; text-align: center; }
-  .flujo-tabla-wrap { border: 3px solid #5c3d1e; margin-top: 8px; width: fit-content; max-width: none; }
-  .flujo-tabla { border-collapse: collapse; width: 100%; table-layout: auto; }
-  .flujo-tabla td { border: 1.5px solid #d4b896; padding: 8px 10px; font-size: 12.5px; vertical-align: middle; white-space: nowrap; }
-  .footer { margin-top: 32px; padding-top: 14px; border-top: 1px solid #e2d5c3; display: flex; justify-content: space-between; align-items: center; }
-  .footer-autor { font-style: italic; font-size: 12px; color: #9a7a5a; }
-  .footer-logo { font-family: 'Playfair Display', serif; font-size: 11px; color: #c4a882; letter-spacing: 0.08em; }
-  @media print {
-    body { padding: 32px 40px; }
-    .border-top { margin: -32px -40px 24px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .stats, .badge, .badge-cat, .badge-tag, .apto span { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  }
-</style>
-</head>
-<body>
-<div class="border-top"></div>
-<div class="header-meta">
-  <div class="badges">
-    <span class="badge badge-cat">${receta.categoria}</span>
-    ${receta.tipo_cocina ? `<span class="badge badge-cat">${receta.tipo_cocina}</span>` : ""}
-    ${receta.dificultad ? `<span class="badge badge-cat">${receta.dificultad}</span>` : ""}
-    ${(receta.apto_para || []).map(a => `<span class="badge badge-tag">${a}</span>`).join("")}
-  </div>
-  <div class="logo">Mi Recetario</div>
-</div>
-<h1>${receta.nombre}</h1>
-${receta.autor ? `<div class="autor">por ${receta.autor}</div>` : ""}
-${receta.libro ? `<div class="libro">📖 ${receta.libro}</div>` : ""}
-${receta.descripcion ? `<p class="descripcion">${receta.descripcion}</p>` : ""}
-<div class="stats">
-  ${tiempoPrep ? `<div class="stat"><span class="stat-icon">🔪</span><span class="stat-value">${tiempoPrep}</span><span class="stat-label">Preparación</span></div>` : ""}
-  ${tiempoCoccion ? `<div class="stat"><span class="stat-icon">🔥</span><span class="stat-value">${tiempoCoccion}</span><span class="stat-label">Cocción</span></div>` : ""}
-  ${tiempoTotal ? `<div class="stat"><span class="stat-icon">🕐</span><span class="stat-value">${tiempoTotal}</span><span class="stat-label">Total</span></div>` : ""}
-  ${receta.raciones ? `<div class="stat"><span class="stat-icon">👥</span><span class="stat-value">${receta.raciones} rac.</span><span class="stat-label">Raciones</span></div>` : ""}
-</div>
-<div class="body">
-  <div>
-    <div class="section-title">Ingredientes</div>
-    <ul class="ing-list">
-      ${(receta.ingredientes_detalle || []).map(ing => {
-        const texto = ing.unidad === "al gusto" || ing.cantidad === null
-          ? `${capitalize(ing.nombre)} <em style="color:#9a7050">— al gusto</em>`
-          : `<strong>${ing.cantidad} ${ing.unidad.toLowerCase()}</strong> de ${capitalize(ing.nombre)}`;
-        return `<li><span class="ing-dot"></span><span>${texto}</span></li>`;
-      }).join("")}
-    </ul>
-  </div>
-  <div>
-    <div class="section-title">Elaboración</div>
-    <ol class="steps">
-      ${(receta.pasos || []).map((paso, i) => `
-        <li><span class="step-num">${i + 1}</span><span class="step-text">${paso}</span></li>
-      `).join("")}
-    </ol>
-  </div>
-</div>
-${receta.tabla_flujo ? (() => {
-  const { columnas, totalFilas } = construirGridFlujo(receta.tabla_flujo.columnas || []);
-  let filasHtml = "";
-  for (let r = 0; r < totalFilas; r++) {
-    filasHtml += "<tr>";
-    columnas.forEach(col => {
-      const celda = col.find(f => f.inicio === r);
-      if (celda) filasHtml += `<td rowspan="${celda.rowspan || 1}" style="text-align:${celda.texto ? "left" : "center"}">${celda.texto || ""}</td>`;
+  autoTable(doc, {
+    startY: y,
+    margin: { left: marginX, right: marginX },
+    head: [["Ingredientes"]],
+    body: (receta.ingredientes_detalle || []).map(i => [formatIngPdf(i)]),
+    theme: "plain",
+    styles: { fontSize: 10, textColor: COLOR_TEXTO, cellPadding: 1.5 },
+    headStyles: { fontStyle: "bold", textColor: COLOR_ACENTO, fontSize: 9 },
+  });
+
+  const yTrasIngredientes = doc.lastAutoTable.finalY + 8;
+
+  autoTable(doc, {
+    startY: yTrasIngredientes,
+    margin: { left: marginX, right: marginX },
+    head: [["Elaboración"]],
+    body: (receta.pasos || []).map((p, i) => [`${i + 1}. ${p}`]),
+    theme: "plain",
+    styles: { fontSize: 10, textColor: COLOR_TEXTO, cellPadding: 1.5 },
+    headStyles: { fontStyle: "bold", textColor: COLOR_ACENTO, fontSize: 9 },
+  });
+
+  // --- Página(s) siguientes: esquema visual (tabla de flujo), apaisada ---
+  if (receta.tabla_flujo) {
+    doc.addPage("a4", "landscape");
+    let y2 = 15;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(...COLOR_TITULO);
+    doc.text("Esquema visual", marginX, y2);
+    y2 += 8;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    (receta.tabla_flujo.notas_previas || []).forEach(nota => {
+      doc.setDrawColor(...COLOR_BORDE);
+      const lineas = doc.splitTextToSize(nota, 260);
+      doc.rect(marginX, y2 - 4, 267, lineas.length * 4.5 + 4);
+      doc.text(lineas, marginX + 3, y2);
+      y2 += lineas.length * 4.5 + 8;
     });
-    filasHtml += "</tr>";
-  }
-  const notasHtml = (receta.tabla_flujo.notas_previas || []).map(n => `<div class="flujo-nota">${n}</div>`).join("");
-  return `<div class="flujo"><div class="section-title">Esquema visual</div>${notasHtml}<div class="flujo-tabla-wrap"><table class="flujo-tabla"><tbody>${filasHtml}</tbody></table></div></div>`;
-})() : ""}
-<div class="footer">
-  <span class="footer-autor">${receta.autor ? `Receta de ${receta.autor}${receta.libro ? ` · ${receta.libro}` : ""}` : receta.libro ? `📖 ${receta.libro}` : "Mi Recetario"}</span>
-  <span class="footer-logo">Mi Recetario</span>
-</div>
-</body>
-</html>`;
 
-  const ventana = window.open("", "_blank");
-  ventana.document.write(html);
-  ventana.document.close();
-  ventana.focus();
-  setTimeout(() => ventana.print(), 600);
+    const { columnas, totalFilas } = construirGridFlujo(receta.tabla_flujo.columnas || []);
+    const body = [];
+    for (let r = 0; r < totalFilas; r++) {
+      const row = [];
+      columnas.forEach(col => {
+        const celda = col.find(f => f.inicio === r);
+        if (celda) {
+          const texto = celda.texto || "—";
+          row.push(celda.rowspan > 1 ? { content: texto, rowSpan: celda.rowspan } : texto);
+        }
+      });
+      body.push(row);
+    }
+
+    autoTable(doc, {
+      startY: y2,
+      margin: { left: marginX, right: marginX },
+      body,
+      theme: "grid",
+      styles: { fontSize: 8, textColor: COLOR_TEXTO, lineColor: COLOR_BORDE, lineWidth: 0.3, cellPadding: 2, valign: "middle" },
+      tableLineColor: COLOR_MARCO,
+      tableLineWidth: 0.8,
+    });
+  }
+
+  doc.save(`${receta.nombre}.pdf`);
 };
 
 export default function RecetasApp() {
@@ -868,7 +862,7 @@ const importarJSON = (e) => {
             <div style={{ display: "flex", gap: 10, borderTop: "1px solid #e0ccb0", paddingTop: 20, flexWrap: "wrap" }}>
               <button style={s.btnSecondary} onClick={() => abrirEditar(recetaActiva)}>✏️ Editar</button>
               <button style={{ ...s.btnSecondary, color: "#8b3a2a", borderColor: "#8b3a2a" }} onClick={() => eliminarReceta(recetaActiva.id)}>🗑️ Eliminar</button>
-              <button style={{ ...s.btnSecondary, marginLeft: "auto" }} onClick={() => imprimirReceta(recetaActiva)}>🖨️ Imprimir / PDF</button>
+              <button style={{ ...s.btnSecondary, marginLeft: "auto" }} onClick={() => generarPDF(recetaActiva)}>📄 Descargar PDF</button>
             </div>
           </div>
         </main>
