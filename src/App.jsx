@@ -51,6 +51,12 @@ const notaColor = (n) => {
 
 const capitalize = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
 
+const UNIDADES_SI = ["g", "kg", "ml", "l"];
+const formatCantidadUnidad = (cantidad, unidad) => {
+  const u = (unidad || "").toLowerCase();
+  return UNIDADES_SI.includes(u) ? `${cantidad}${u}` : `${cantidad} ${u}`;
+};
+
 // Construye la rejilla de la tabla de flujo (esquema visual) a partir de columnas
 // con celdas que ocupan varias filas (rowspan), calculando en qué fila empieza cada celda.
 const construirGridFlujo = (columnas) => {
@@ -70,7 +76,7 @@ const formatIngPdf = (ing) => {
   if (ing.unidad === "al gusto" || ing.cantidad === null) {
     return `${capitalize(ing.nombre)} — al gusto`;
   }
-  return `${ing.cantidad} ${ing.unidad.toLowerCase()} de ${capitalize(ing.nombre)}`;
+  return `${formatCantidadUnidad(ing.cantidad, ing.unidad)} de ${capitalize(ing.nombre)}`;
 };
 
 // Genera el PDF de la receta directamente con jsPDF (sin pasar por el diálogo de
@@ -124,26 +130,62 @@ const generarPDF = (receta) => {
   if (receta.raciones) stats.push(`${receta.raciones} raciones`);
   if (stats.length) { doc.text(stats.join("   ·   "), marginX, y); y += 8; }
 
-  autoTable(doc, {
-    startY: y,
-    margin: { left: marginX, right: marginX },
-    head: [["Ingredientes"]],
-    body: (receta.ingredientes_detalle || []).map(i => [formatIngPdf(i)]),
-    theme: "plain",
-    styles: { fontSize: 10, textColor: COLOR_TEXTO, cellPadding: 1.5 },
-    headStyles: { fontStyle: "bold", textColor: COLOR_ACENTO, fontSize: 9 },
+  const anchoUtil = 210 - marginX * 2; // A4 vertical menos márgenes
+
+  const asegurarEspacio = (alturaNecesaria) => {
+    if (y + alturaNecesaria > 280) {
+      doc.addPage("a4", "portrait");
+      y = 20;
+    }
+  };
+
+  // --- Ingredientes: bullet (punto) igual que en la web ---
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...COLOR_ACENTO);
+  doc.text("INGREDIENTES", marginX, y);
+  y += 7;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10.5);
+  doc.setTextColor(...COLOR_TEXTO);
+  (receta.ingredientes_detalle || []).forEach(ing => {
+    const lineas = doc.splitTextToSize(formatIngPdf(ing), anchoUtil - 6);
+    const altura = lineas.length * 5 + 2;
+    asegurarEspacio(altura);
+    doc.setFillColor(...COLOR_ACENTO);
+    doc.circle(marginX + 1, y - 1.6, 0.9, "F");
+    doc.text(lineas, marginX + 6, y);
+    y += altura;
   });
 
-  const yTrasIngredientes = doc.lastAutoTable.finalY + 8;
+  y += 8;
 
-  autoTable(doc, {
-    startY: yTrasIngredientes,
-    margin: { left: marginX, right: marginX },
-    head: [["Elaboración"]],
-    body: (receta.pasos || []).map((p, i) => [`${i + 1}. ${p}`]),
-    theme: "plain",
-    styles: { fontSize: 10, textColor: COLOR_TEXTO, cellPadding: 1.5 },
-    headStyles: { fontStyle: "bold", textColor: COLOR_ACENTO, fontSize: 9 },
+  // --- Elaboración: círculo numerado igual que en la web ---
+  asegurarEspacio(14);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...COLOR_ACENTO);
+  doc.text("ELABORACIÓN", marginX, y);
+  y += 8;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10.5);
+  (receta.pasos || []).forEach((paso, i) => {
+    const lineas = doc.splitTextToSize(paso, anchoUtil - 11);
+    const altura = Math.max(lineas.length * 5.2, 7) + 4;
+    asegurarEspacio(altura);
+    doc.setFillColor(...COLOR_ACENTO);
+    doc.circle(marginX + 3, y - 1.8, 3.2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text(String(i + 1), marginX + 3, y - 0.3, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+    doc.setTextColor(...COLOR_TEXTO);
+    doc.text(lineas, marginX + 10, y);
+    y += altura;
   });
 
   // --- Página(s) siguientes: esquema visual (tabla de flujo), apaisada ---
@@ -191,7 +233,8 @@ const generarPDF = (receta) => {
     });
   }
 
-  doc.save(`${receta.nombre}.pdf`);
+  const urlPdf = doc.output("bloburl");
+  window.open(urlPdf, "_blank");
 };
 
 export default function RecetasApp() {
@@ -757,9 +800,9 @@ const importarJSON = (e) => {
                         </span>
                       ) : (
                         <span style={{ fontSize: 15, color: "#3d2400" }}>
-                          <strong style={{ color: escalado ? "#c4843c" : "#2c1f0e" }}>{cantEscalada} {ing.unidad.toLowerCase()}</strong>
+                          <strong style={{ color: escalado ? "#c4843c" : "#2c1f0e" }}>{formatCantidadUnidad(cantEscalada, ing.unidad)}</strong>
                           {" de "}{capitalize(ing.nombre)}
-                          {escalado && <span style={{ color: "#b0906a", fontSize: 12, marginLeft: 6 }}>(orig. {ing.cantidad} {ing.unidad.toLowerCase()})</span>}
+                          {escalado && <span style={{ color: "#b0906a", fontSize: 12, marginLeft: 6 }}>(orig. {formatCantidadUnidad(ing.cantidad, ing.unidad)})</span>}
                         </span>
                       )}
                     </div>
@@ -862,7 +905,7 @@ const importarJSON = (e) => {
             <div style={{ display: "flex", gap: 10, borderTop: "1px solid #e0ccb0", paddingTop: 20, flexWrap: "wrap" }}>
               <button style={s.btnSecondary} onClick={() => abrirEditar(recetaActiva)}>✏️ Editar</button>
               <button style={{ ...s.btnSecondary, color: "#8b3a2a", borderColor: "#8b3a2a" }} onClick={() => eliminarReceta(recetaActiva.id)}>🗑️ Eliminar</button>
-              <button style={{ ...s.btnSecondary, marginLeft: "auto" }} onClick={() => generarPDF(recetaActiva)}>📄 Descargar PDF</button>
+              <button style={{ ...s.btnSecondary, marginLeft: "auto" }} onClick={() => generarPDF(recetaActiva)}>📄 Ver PDF</button>
             </div>
           </div>
         </main>
